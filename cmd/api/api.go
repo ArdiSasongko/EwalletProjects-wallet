@@ -38,6 +38,10 @@ func (app *application) mount() *fiber.App {
 
 	r.Get("/health", app.handler.Health.CheckHealth)
 
+	v1 := r.Group("/v1")
+	wallet := v1.Group("/wallet")
+	wallet.Post("/", app.handler.Wallet.CreateWallet)
+
 	return r
 }
 
