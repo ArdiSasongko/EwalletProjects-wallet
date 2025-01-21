@@ -6,7 +6,7 @@ import (
 
 func main() {
 	// setup grpc
-	go api.SetupGRPC()
+	//go api.SetupGRPC()
 
 	// setup http
 	api.SetupHTTP()

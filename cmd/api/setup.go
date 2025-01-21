@@ -6,6 +6,8 @@ import (
 	"github.com/ArdiSasongko/EwalletProjects-wallet/internal/config/db"
 	"github.com/ArdiSasongko/EwalletProjects-wallet/internal/config/logger"
 	"github.com/ArdiSasongko/EwalletProjects-wallet/internal/env"
+	"github.com/ArdiSasongko/EwalletProjects-wallet/internal/handler"
+	"github.com/ArdiSasongko/EwalletProjects-wallet/internal/storage/sqlc"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/sirupsen/logrus"
@@ -58,17 +60,19 @@ func SetupHTTPApplication() (*application, error) {
 		cfg.logger.Fatal(err.Error())
 	}
 
-	// conn, err := ConnectDatabase(cfg.db, cfg.logger)
-	// if err != nil {
-	// 	cfg.logger.Fatalf("failed to connected database :%v", err)
-	// }
+	conn, err := ConnectDatabase(cfg.db, cfg.logger)
+	if err != nil {
+		cfg.logger.Fatalf("failed to connected database :%v", err)
+	}
 
 	// auth := auth.NewJwt(cfg.auth.secret, cfg.auth.aud, cfg.auth.iss)
-	// handler := handler.NewHandler(conn, auth)
+	q := sqlc.New(conn)
+
+	handler := handler.NewHandler(q)
 
 	return &application{
-		config: cfg,
-		//handler: handler,
+		config:  cfg,
+		handler: handler,
 	}, nil
 }
 
