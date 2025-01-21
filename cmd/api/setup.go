@@ -68,7 +68,7 @@ func SetupHTTPApplication() (*application, error) {
 	// auth := auth.NewJwt(cfg.auth.secret, cfg.auth.aud, cfg.auth.iss)
 	q := sqlc.New(conn)
 
-	handler := handler.NewHandler(q)
+	handler := handler.NewHandler(q, conn)
 
 	return &application{
 		config:  cfg,

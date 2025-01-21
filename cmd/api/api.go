@@ -41,6 +41,10 @@ func (app *application) mount() *fiber.App {
 	v1 := r.Group("/v1")
 	wallet := v1.Group("/wallet")
 	wallet.Post("/", app.handler.Wallet.CreateWallet)
+	wallet.Put("/credit", app.handler.Middleware.AuthMiddleware(), app.handler.Wallet.Credit)
+	wallet.Put("/debit", app.handler.Middleware.AuthMiddleware(), app.handler.Wallet.Debit)
+	wallet.Get("/balance", app.handler.Middleware.AuthMiddleware(), app.handler.Wallet.Balance)
+	wallet.Get("/history", app.handler.Middleware.AuthMiddleware(), app.handler.Wallet.HistoryTransaction)
 
 	return r
 }

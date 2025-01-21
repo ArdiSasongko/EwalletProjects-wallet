@@ -29,3 +29,59 @@ func (q *Queries) CreateWallet(ctx context.Context, userID int32) (CreateWalletR
 	err := row.Scan(&i.UserID, &i.Balance, &i.CreatedAt)
 	return i, err
 }
+
+const creditWalletBalance = `-- name: CreditWalletBalance :one
+UPDATE wallets
+SET balance = balance + $1, updated_at = NOW()
+WHERE user_id = $2
+RETURNING user_id
+`
+
+type CreditWalletBalanceParams struct {
+	Balance pgtype.Numeric
+	UserID  int32
+}
+
+func (q *Queries) CreditWalletBalance(ctx context.Context, arg CreditWalletBalanceParams) (int32, error) {
+	row := q.db.QueryRow(ctx, creditWalletBalance, arg.Balance, arg.UserID)
+	var user_id int32
+	err := row.Scan(&user_id)
+	return user_id, err
+}
+
+const debitWalletBalance = `-- name: DebitWalletBalance :one
+UPDATE wallets
+SET balance = balance - $1, updated_at = NOW()
+WHERE user_id = $2
+RETURNING user_id
+`
+
+type DebitWalletBalanceParams struct {
+	Balance pgtype.Numeric
+	UserID  int32
+}
+
+func (q *Queries) DebitWalletBalance(ctx context.Context, arg DebitWalletBalanceParams) (int32, error) {
+	row := q.db.QueryRow(ctx, debitWalletBalance, arg.Balance, arg.UserID)
+	var user_id int32
+	err := row.Scan(&user_id)
+	return user_id, err
+}
+
+const getWalletByUserId = `-- name: GetWalletByUserId :one
+SELECT user_id, balance, created_at, updated_at
+FROM wallets
+WHERE user_id = $1
+`
+
+func (q *Queries) GetWalletByUserId(ctx context.Context, userID int32) (Wallet, error) {
+	row := q.db.QueryRow(ctx, getWalletByUserId, userID)
+	var i Wallet
+	err := row.Scan(
+		&i.UserID,
+		&i.Balance,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
