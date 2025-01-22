@@ -5,8 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math/big"
-	"math/rand/v2"
+	"math"
 
 	"github.com/ArdiSasongko/EwalletProjects-wallet/internal/model"
 	"github.com/ArdiSasongko/EwalletProjects-wallet/internal/storage/sqlc"
@@ -32,38 +31,59 @@ func (s *WalletService) CreateWallet(ctx context.Context, id int32) (*model.Wall
 		}
 	}
 
+	balance, _ := resp.Balance.Float64Value()
 	return &model.WalletResponse{
 		UserID:    resp.UserID,
-		Balance:   float32(resp.Balance.Exp),
+		Balance:   float32(balance.Float64),
 		CreatedAt: resp.CreatedAt.Time,
 	}, err
 }
 
-func (s *WalletService) WalletCredit(ctx context.Context, payload *model.TransactionCredit) (sqlc.InsertWalletTransactionsCreditRow, error) {
-	resp, err := s.createCredit(ctx, int64(payload.UserID), payload.Amount)
+func (s *WalletService) WalletCredit(ctx context.Context, payload *model.TransactionCredit) (model.TransactionResponse, error) {
+	resp, err := s.createCredit(ctx, payload.UserID, payload.Amount, payload.Reference)
 	if err != nil {
-		return sqlc.InsertWalletTransactionsCreditRow{}, err
+		return model.TransactionResponse{}, err
 	}
 
-	return resp, nil
+	amount, _ := resp.Amount.Float64Value()
+	mappingResponse := model.TransactionResponse{
+		UserID:    resp.WalletID,
+		Amount:    amount.Float64,
+		Reference: resp.Reference,
+		CreatedAt: resp.CreatedAt.Time,
+	}
+	return mappingResponse, nil
 }
 
-func (s *WalletService) WalletDebit(ctx context.Context, payload *model.TransactionDebit) (sqlc.InsertWalletTransactionsDebitRow, error) {
-	resp, err := s.createDebit(ctx, int64(payload.UserID), payload.Amount)
+func (s *WalletService) WalletDebit(ctx context.Context, payload *model.TransactionDebit) (model.TransactionResponse, error) {
+	resp, err := s.createDebit(ctx, payload.UserID, payload.Amount, payload.Reference)
 	if err != nil {
-		return sqlc.InsertWalletTransactionsDebitRow{}, err
+		return model.TransactionResponse{}, err
 	}
 
-	return resp, nil
+	amount, _ := resp.Amount.Float64Value()
+	mappingResponse := model.TransactionResponse{
+		UserID:    resp.WalletID,
+		Amount:    amount.Float64,
+		Reference: resp.Reference,
+		CreatedAt: resp.CreatedAt.Time,
+	}
+	return mappingResponse, nil
 }
 
-func (s *WalletService) GetBalance(ctx context.Context, userID int32) (sqlc.Wallet, error) {
+func (s *WalletService) GetBalance(ctx context.Context, userID int32) (model.BalanceResponse, error) {
 	resp, err := s.q.GetWalletByUserId(ctx, userID)
 	if err != nil {
-		return sqlc.Wallet{}, err
+		return model.BalanceResponse{}, err
 	}
 
-	return resp, nil
+	balance, _ := resp.Balance.Float64Value()
+	return model.BalanceResponse{
+		UserID:    resp.UserID,
+		Balance:   float32(balance.Float64),
+		CreatedAt: resp.CreatedAt.Time,
+		UpdatedAt: resp.UpdatedAt.Time,
+	}, nil
 }
 
 func (s *WalletService) GetHistoryTransaction(ctx context.Context, payload model.HistoryPayload) ([]sqlc.GetHistoryTransactionsRow, error) {
@@ -96,16 +116,11 @@ func (s *WalletService) GetHistoryTransaction(ctx context.Context, payload model
 	return resp, nil
 }
 
-func generateRandomReference(length int) string {
-	charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[rand.IntN(len(charset))]
-	}
-	return string(b)
+func roundToTwoDecimalPlaces(amount float64) float64 {
+	return math.Round(amount*100) / 100
 }
 
-func (s *WalletService) createCredit(ctx context.Context, userID int64, amount int32) (sqlc.InsertWalletTransactionsCreditRow, error) {
+func (s *WalletService) createCredit(ctx context.Context, userID int32, amount float64, ref string) (sqlc.InsertWalletTransactionsCreditRow, error) {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return sqlc.InsertWalletTransactionsCreditRow{}, err
@@ -116,25 +131,23 @@ func (s *WalletService) createCredit(ctx context.Context, userID int64, amount i
 
 	qtx := s.q.WithTx(tx)
 
-	amountBigInt := big.NewInt(int64(amount))
+	amountFloat := roundToTwoDecimalPlaces(amount)
+	amountStr := fmt.Sprintf("%.2f", amountFloat)
+	amountNumeric := pgtype.Numeric{}
+	if err := amountNumeric.Scan(amountStr); err != nil {
+		return sqlc.InsertWalletTransactionsCreditRow{}, fmt.Errorf("failed to convert amount to numeric :%w", err)
+	}
 	id, err := qtx.CreditWalletBalance(ctx, sqlc.CreditWalletBalanceParams{
-		UserID: int32(userID),
-		Balance: pgtype.Numeric{
-			Int:   amountBigInt,
-			Valid: true,
-		},
+		UserID:  userID,
+		Balance: amountNumeric,
 	})
 	if err != nil {
 		return sqlc.InsertWalletTransactionsCreditRow{}, err
 	}
 
-	ref := generateRandomReference(12)
 	resp, err := qtx.InsertWalletTransactionsCredit(ctx, sqlc.InsertWalletTransactionsCreditParams{
-		WalletID: id,
-		Amount: pgtype.Numeric{
-			Int:   amountBigInt,
-			Valid: true,
-		},
+		WalletID:  id,
+		Amount:    amountNumeric,
 		Reference: ref,
 	})
 
@@ -149,7 +162,7 @@ func (s *WalletService) createCredit(ctx context.Context, userID int64, amount i
 	return resp, nil
 }
 
-func (s *WalletService) createDebit(ctx context.Context, userID int64, amount int32) (sqlc.InsertWalletTransactionsDebitRow, error) {
+func (s *WalletService) createDebit(ctx context.Context, userID int32, amount float64, ref string) (sqlc.InsertWalletTransactionsDebitRow, error) {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return sqlc.InsertWalletTransactionsDebitRow{}, err
@@ -157,38 +170,40 @@ func (s *WalletService) createDebit(ctx context.Context, userID int64, amount in
 	defer tx.Rollback(ctx)
 
 	qtx := s.q.WithTx(tx)
-	amountBigInt := big.NewInt(int64(amount))
-
-	// check balance
-	respBal, err := qtx.GetWalletByUserId(ctx, int32(userID))
-	if err != nil {
-		return sqlc.InsertWalletTransactionsDebitRow{}, nil
+	amountFloat := roundToTwoDecimalPlaces(amount)
+	amountStr := fmt.Sprintf("%.2f", amountFloat)
+	amountNumeric := pgtype.Numeric{}
+	if err := amountNumeric.Scan(amountStr); err != nil {
+		return sqlc.InsertWalletTransactionsDebitRow{}, fmt.Errorf("failed to convert amount to numeric :%w", err)
 	}
 
-	balance := respBal.Balance.Int.Int64()
-	log.Println(balance)
-	if balance < amountBigInt.Int64() {
-		return sqlc.InsertWalletTransactionsDebitRow{}, fmt.Errorf("balance is not enough for this transaction, balance: %d", balance)
+	respBal, err := qtx.GetWalletByUserId(ctx, userID)
+	if err != nil {
+		return sqlc.InsertWalletTransactionsDebitRow{}, err
+	}
+
+	balanceFloat, _ := respBal.Balance.Float64Value()
+	log.Println(balanceFloat.Float64)
+	log.Println(amountFloat)
+	if balanceFloat.Float64 < amountFloat {
+		return sqlc.InsertWalletTransactionsDebitRow{}, fmt.Errorf("balance is not enough for this transaction, balance: %.2f", balanceFloat.Float64)
+	}
+
+	if balanceFloat.Float64-amountFloat <= 50000.00 {
+		return sqlc.InsertWalletTransactionsDebitRow{}, fmt.Errorf("balance is not enough for this transaction, min balance (50000) balance: %.2f", balanceFloat.Float64)
 	}
 
 	id, err := qtx.DebitWalletBalance(ctx, sqlc.DebitWalletBalanceParams{
-		UserID: int32(userID),
-		Balance: pgtype.Numeric{
-			Int:   amountBigInt,
-			Valid: true,
-		},
+		UserID:  int32(userID),
+		Balance: amountNumeric,
 	})
 	if err != nil {
 		return sqlc.InsertWalletTransactionsDebitRow{}, err
 	}
 
-	ref := generateRandomReference(12)
 	resp, err := qtx.InsertWalletTransactionsDebit(ctx, sqlc.InsertWalletTransactionsDebitParams{
-		WalletID: id,
-		Amount: pgtype.Numeric{
-			Int:   amountBigInt,
-			Valid: true,
-		},
+		WalletID:  id,
+		Amount:    amountNumeric,
 		Reference: ref,
 	})
 

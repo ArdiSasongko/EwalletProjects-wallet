@@ -11,9 +11,9 @@ import (
 type Service struct {
 	Wallet interface {
 		CreateWallet(context.Context, int32) (*model.WalletResponse, error)
-		WalletCredit(context.Context, *model.TransactionCredit) (sqlc.InsertWalletTransactionsCreditRow, error)
-		WalletDebit(context.Context, *model.TransactionDebit) (sqlc.InsertWalletTransactionsDebitRow, error)
-		GetBalance(context.Context, int32) (sqlc.Wallet, error)
+		WalletCredit(context.Context, *model.TransactionCredit) (model.TransactionResponse, error)
+		WalletDebit(context.Context, *model.TransactionDebit) (model.TransactionResponse, error)
+		GetBalance(context.Context, int32) (model.BalanceResponse, error)
 		GetHistoryTransaction(ctx context.Context, payload model.HistoryPayload) ([]sqlc.GetHistoryTransactionsRow, error)
 	}
 }

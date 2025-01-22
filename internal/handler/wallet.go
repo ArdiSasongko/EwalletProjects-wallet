@@ -55,6 +55,7 @@ func (h *WalletHandler) Credit(ctx *fiber.Ctx) error {
 		})
 	}
 
+	log.Println("amount", payload.Amount)
 	if err := payload.Validate(); err != nil {
 		errorValidate := fmt.Errorf("validate error")
 		log.WithError(errorValidate).Errorf("bad request error, method: %v, path: %v", ctx.Method(), ctx.Path())

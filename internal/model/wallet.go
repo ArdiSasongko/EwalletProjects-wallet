@@ -26,9 +26,16 @@ type WalletResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type BalanceResponse struct {
+	UserID    int32     `json:"user_id"`
+	Balance   float32   `json:"balance"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
 type TransactionCredit struct {
-	UserID int32 `json:"user_id"`
-	Amount int32 `json:"amount" validate:"required,numeric,gte=50000"`
+	UserID    int32   `json:"user_id"`
+	Amount    float64 `json:"amount" validate:"required,numeric,gte=50000"`
+	Reference string  `json:"reference" validate:"required"`
 }
 
 func (u *TransactionCredit) Validate() error {
@@ -36,8 +43,9 @@ func (u *TransactionCredit) Validate() error {
 }
 
 type TransactionDebit struct {
-	UserID int32 `json:"user_id"`
-	Amount int32 `json:"amount" validate:"required,numeric,gte=1000"`
+	UserID    int32   `json:"user_id"`
+	Amount    float64 `json:"amount" validate:"required,numeric,gte=1000"`
+	Reference string  `json:"reference" validate:"required"`
 }
 
 func (u *TransactionDebit) Validate() error {
@@ -46,7 +54,7 @@ func (u *TransactionDebit) Validate() error {
 
 type TransactionResponse struct {
 	UserID    int32     `json:"user_id"`
-	Amount    int32     `json:"amount"`
+	Amount    float64   `json:"amount"`
 	Reference string    `json:"reference"`
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -56,4 +64,13 @@ type HistoryPayload struct {
 	TransactionType string `json:"transaction_type"`
 	Offset          int32  `json:"offset"`
 	Limit           int32  `json:"limit"`
+}
+
+type TransactionPayload struct {
+	Amount    int32  `json:"amount" validate:"required"`
+	Reference string `json:"reference" validate:"required"`
+}
+
+func (u *TransactionPayload) Validate() error {
+	return Validate.Struct(u)
 }
