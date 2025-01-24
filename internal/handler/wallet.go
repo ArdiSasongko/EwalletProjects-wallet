@@ -47,7 +47,11 @@ func (h *WalletHandler) CreateWallet(ctx *fiber.Ctx) error {
 func (h *WalletHandler) Credit(ctx *fiber.Ctx) error {
 	data := ctx.Locals("token").(model.TokenResponse)
 	payload := new(model.TransactionCredit)
+	if payload.Status == " " {
+		payload.Status = "SUCCESS"
+	}
 
+	payload.Email = data.Email
 	if err := ctx.BodyParser(payload); err != nil {
 		log.WithError(err).Errorf("bad request error, method: %v, path: %v", ctx.Method(), ctx.Path())
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -81,6 +85,8 @@ func (h *WalletHandler) Debit(ctx *fiber.Ctx) error {
 	data := ctx.Locals("token").(model.TokenResponse)
 	payload := new(model.TransactionDebit)
 
+	log.Println(payload.Status)
+	payload.Email = data.Email
 	if err := ctx.BodyParser(payload); err != nil {
 		log.WithError(err).Errorf("bad request error, method: %v, path: %v", ctx.Method(), ctx.Path())
 		return ctx.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -112,6 +118,7 @@ func (h *WalletHandler) Debit(ctx *fiber.Ctx) error {
 func (h *WalletHandler) Balance(ctx *fiber.Ctx) error {
 	data := ctx.Locals("token").(model.TokenResponse)
 
+	log.Println(data.Email)
 	resp, err := h.service.Wallet.GetBalance(ctx.Context(), data.UserID)
 	if err != nil {
 		log.WithError(err).Errorf("internal server error, method: %v, path: %v", ctx.Method(), ctx.Path())

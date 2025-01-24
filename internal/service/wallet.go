@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"strings"
 
+	"github.com/ArdiSasongko/EwalletProjects-wallet/internal/external"
 	"github.com/ArdiSasongko/EwalletProjects-wallet/internal/model"
 	"github.com/ArdiSasongko/EwalletProjects-wallet/internal/storage/sqlc"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -15,8 +17,9 @@ import (
 )
 
 type WalletService struct {
-	q  *sqlc.Queries
-	db *pgxpool.Pool
+	q        *sqlc.Queries
+	db       *pgxpool.Pool
+	external external.External
 }
 
 func (s *WalletService) CreateWallet(ctx context.Context, id int32) (*model.WalletResponse, error) {
@@ -41,32 +44,70 @@ func (s *WalletService) CreateWallet(ctx context.Context, id int32) (*model.Wall
 
 func (s *WalletService) WalletCredit(ctx context.Context, payload *model.TransactionCredit) (model.TransactionResponse, error) {
 	resp, err := s.createCredit(ctx, payload.UserID, payload.Amount, payload.Reference)
+	amount, _ := resp.Amount.Float64Value()
 	if err != nil {
 		return model.TransactionResponse{}, err
 	}
 
-	amount, _ := resp.Amount.Float64Value()
 	mappingResponse := model.TransactionResponse{
 		UserID:    resp.WalletID,
 		Amount:    amount.Float64,
 		Reference: resp.Reference,
 		CreatedAt: resp.CreatedAt.Time,
+	}
+
+	log.Println(payload.Status)
+	templateName := "topup_success"
+	if strings.Contains(payload.Reference, "REFUND") {
+		templateName = "refund_success"
+	}
+
+	log.Println("template", templateName)
+
+	if err := s.external.Notif.SendNotification(ctx, external.NotifRequest{
+		Recipient:    payload.Email,
+		TemplateName: templateName,
+		Placeholder: map[string]string{
+			"user_id":    string(resp.WalletID),
+			"amount":     fmt.Sprintf("%.2f", amount.Float64),
+			"reference":  resp.Reference,
+			"created_at": resp.CreatedAt.Time.Format("2006-01-02 15:04:05"),
+		},
+	}); err != nil {
+		return model.TransactionResponse{}, fmt.Errorf("failed send success purchase : %w", err)
 	}
 	return mappingResponse, nil
 }
 
 func (s *WalletService) WalletDebit(ctx context.Context, payload *model.TransactionDebit) (model.TransactionResponse, error) {
 	resp, err := s.createDebit(ctx, payload.UserID, payload.Amount, payload.Reference)
+	amount, _ := resp.Amount.Float64Value()
 	if err != nil {
 		return model.TransactionResponse{}, err
 	}
 
-	amount, _ := resp.Amount.Float64Value()
 	mappingResponse := model.TransactionResponse{
 		UserID:    resp.WalletID,
 		Amount:    amount.Float64,
 		Reference: resp.Reference,
 		CreatedAt: resp.CreatedAt.Time,
+	}
+
+	log.Println(payload.Status)
+	var templateName = "purchase_success"
+	log.Println("template", templateName)
+
+	if err := s.external.Notif.SendNotification(ctx, external.NotifRequest{
+		Recipient:    payload.Email,
+		TemplateName: templateName,
+		Placeholder: map[string]string{
+			"user_id":    string(resp.WalletID),
+			"amount":     fmt.Sprintf("%.2f", amount.Float64),
+			"reference":  resp.Reference,
+			"created_at": resp.CreatedAt.Time.Format("2006-01-02 15:04:05"),
+		},
+	}); err != nil {
+		return model.TransactionResponse{}, fmt.Errorf("failed send success purchase : %w", err)
 	}
 	return mappingResponse, nil
 }

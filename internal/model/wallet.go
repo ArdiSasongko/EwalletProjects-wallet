@@ -36,6 +36,8 @@ type TransactionCredit struct {
 	UserID    int32   `json:"user_id"`
 	Amount    float64 `json:"amount" validate:"required,numeric,gte=50000"`
 	Reference string  `json:"reference" validate:"required"`
+	Email     string  `json:"email"`
+	Status    string  `json:"status"`
 }
 
 func (u *TransactionCredit) Validate() error {
@@ -46,6 +48,8 @@ type TransactionDebit struct {
 	UserID    int32   `json:"user_id"`
 	Amount    float64 `json:"amount" validate:"required,numeric,gte=1000"`
 	Reference string  `json:"reference" validate:"required"`
+	Email     string  `json:"email"`
+	Status    string  `json:"status" validate:"required"`
 }
 
 func (u *TransactionDebit) Validate() error {

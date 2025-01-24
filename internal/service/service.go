@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	"github.com/ArdiSasongko/EwalletProjects-wallet/internal/external"
 	"github.com/ArdiSasongko/EwalletProjects-wallet/internal/model"
 	"github.com/ArdiSasongko/EwalletProjects-wallet/internal/storage/sqlc"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -19,9 +20,11 @@ type Service struct {
 }
 
 func NewService(q *sqlc.Queries, db *pgxpool.Pool) Service {
+	external := external.NewExternal()
 	return Service{
 		Wallet: &WalletService{
-			q:  q,
-			db: db,
+			q:        q,
+			db:       db,
+			external: external,
 		}}
 }

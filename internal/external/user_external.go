@@ -44,5 +44,6 @@ func (u *userManagement) ValidateToken(ctx context.Context, tokenReq string) (mo
 
 	return model.TokenResponse{
 		UserID: response.Data.Id,
+		Email:  response.Data.Email,
 	}, nil
 }
